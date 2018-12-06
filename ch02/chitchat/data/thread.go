@@ -8,7 +8,7 @@ type Thread struct {
 	Id        int
 	Uuid      string
 	Topic     string
-	UserId    int
+	UserOfThread  User
 	CreatedAt time.Time
 }
 
@@ -71,7 +71,7 @@ func (user *User) CreateThread(topic string) (conv Thread, err error) {
 	}
 	defer stmt.Close()
 	// use QueryRow to return a row and scan the returned id into the Session struct
-	err = stmt.QueryRow(createUUID(), topic, user.Id, time.Now()).Scan(&conv.Id, &conv.Uuid, &conv.Topic, &conv.UserId, &conv.CreatedAt)
+	err = stmt.QueryRow(createUUID(), topic, user.Id, time.Now()).Scan(&conv.Id, &conv.Uuid, &conv.Topic, &conv.UserOfThread.Id, &conv.CreatedAt)
 	return
 }
 
@@ -96,9 +96,16 @@ func Threads() (threads []Thread, err error) {
 	}
 	for rows.Next() {
 		conv := Thread{}
-		if err = rows.Scan(&conv.Id, &conv.Uuid, &conv.Topic, &conv.UserId, &conv.CreatedAt); err != nil {
+		userId := ""
+		if err = rows.Scan(&conv.Id, &conv.Uuid, &conv.Topic, &userId, &conv.CreatedAt); err != nil {
 			return
 		}
+		user := User{}
+		user, err := UserById(userId)
+		if err != nil {
+			return
+		}
+		conv.UserOfThread = user
 		threads = append(threads, conv)
 	}
 	rows.Close()
@@ -109,7 +116,7 @@ func Threads() (threads []Thread, err error) {
 func ThreadByUUID(uuid string) (conv Thread, err error) {
 	conv = Thread{}
 	err = Db.QueryRow("SELECT id, uuid, topic, user_id, created_at FROM threads WHERE uuid = $1", uuid).
-		Scan(&conv.Id, &conv.Uuid, &conv.Topic, &conv.UserId, &conv.CreatedAt)
+		Scan(&conv.Id, &conv.Uuid, &conv.Topic, &conv.UserOfThread.Id, &conv.CreatedAt)
 	return
 }
 
